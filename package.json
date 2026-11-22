@@ -1,0 +1,11 @@
+{
+  "name": "tvroot-mod",
+  "version": "1.0.0",
+  "packageType": "app",
+  "appName": "TV Root Probe",
+  "description": "recon",
+  "appPath": "index.html",
+  "serviceFile": "service.js",
+  "tizenAppId": "",
+  "main": "index.html"
+}
