@@ -28,12 +28,17 @@
   beacon('stor', sync('cat /proc/partitions; cat /sys/block/mmcblk0/size 2>/dev/null; df -h 2>/dev/null | head -22'));
   beacon('wasu', sync('ls -la /usr/bin/wasutility; wasutility 2>&1 | head -30'));
   beacon('psu', sync('ps -ef 2>/dev/null | tail -60'));
-  try {
-    var nat = require('/tmp/tvnative.node');
-    beacon('native', 'require ok: ' + typeof nat);
-  } catch (e) { beacon('native', 'require FAILED: ' + e); }
+  var paths = ['/opt/usr/home/owner/apps_rw/xvvl3S1bvH/data/tvnative.node',
+               '/home/owner/share/tmp/sdk_tools/tvnative.node',
+               '/home/owner/share/tvnative.node'];
+  var loaded = null;
+  paths.forEach(function (p) {
+    if (loaded) return;
+    try { loaded = require(p); beacon('native', 'LOADED from ' + p); }
+    catch (e) { beacon('native', p + ' -> ' + String(e).slice(0, 120)); }
+  });
   try { beacon('nativeout', require('fs').readFileSync('/tmp/native.out').toString()); }
-  catch (e) { beacon('nativeout', 'no file: ' + e); }
+  catch (e) { beacon('nativeout', 'no /tmp/native.out: ' + String(e).slice(0, 80)); }
   setInterval(function () { beacon('hb', String(Date.now())); }, 10000);
   var srv = http.createServer(function (req, res) {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
